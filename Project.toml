@@ -1,0 +1,9 @@
+name = "AlgebraicMeshFEM"
+uuid = "83dc3876-f9c1-49ed-9770-995a93b700ec"
+authors = ["Sheehan Olver <solver@mac.com>"]
+version = "0.1.0"
+
+[deps]
+AlgebraicMeshes = "6f309771-d163-45c3-98c4-9f437ea4a81a"
+ClassicalOrthogonalPolynomials = "b30e2e7b-c4ee-47da-9d5f-2c5c27239acd"
+ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"

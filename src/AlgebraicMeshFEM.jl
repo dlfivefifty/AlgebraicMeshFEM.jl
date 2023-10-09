@@ -1,7 +1,8 @@
 module AlgebraicMeshFEM
-using AlgebraicMeshes, ClassicalOrthogonalPolynomials, ContinuumArrays
-using ContinuumArrays: Basis, LayoutVector
+using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays
+using ContinuumArrays: Basis
 import Base: getindex, axes
+export AlgebraicMeshVector
 
 """
     ElementIndex(dim, elnum, basisind)
@@ -20,7 +21,7 @@ end
 gives the map between a mesh and the axes of the correspond
 coefficient vector.
 """
-struct AlgebraicMeshAxis{λ, M<:Mesh, Sz<:Tuple} <: AbstractUnitRange{Int}
+struct AlgebraicMeshAxis{λ, M<:AlgebraicMesh, Sz<:Tuple} <: AbstractUnitRange{Int}
     mesh::M
     sizes::Sz
 end
@@ -34,13 +35,13 @@ function findelementindex(meshaxis, k::Int)
 
 end
 
-struct AlgebraicMeshPolynomial{λ, T, M<:Mesh, Sz<:Tuple} <: Basis{T}
+struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Sz<:Tuple} <: Basis{T}
     mesh::M
     sizes::Sz
 end
 
 
-axes(P::AlgebraicMeshPolynomial{λ}) = (Inclusion(P.mesh), AlgebraicMeshAxis{λ}(P.mesh, P.sizes))
+axes(P::AlgebraicMeshPolynomial{λ}) where λ = (Inclusion(P.mesh), AlgebraicMeshAxis{λ}(P.mesh, P.sizes))
 
 getindex(P::AlgebraicMeshPolynomial, 𝐱::SVector, k::Int) = P[𝐱, findelementindex(axes(P,2), k)]
 function getindex(P::AlgebraicMeshPolynomial{0,T}, 𝐱::SVector, K::ElementIndex) where T
@@ -53,9 +54,25 @@ end
 
 
 
-struct AlgebraicMeshCoefficients{λ, T, M<:Mesh, D<:Dict} <: LayoutVector{T}
+struct AlgebraicMeshArray{T, N, M<:NTuple{N,AlgebraicMesh}, D<:NTuple{N,Tuple}} <: LayoutArray{T,N}
     mesh::M
-    data::D
+    data::D # a tuple of vectors with same structure as mesh, containing vectors/matrices.
+            # we interlace these to produce a single vector/matrix.
+
+    function AlgebraicMeshArray{T, N, M, D}(meshes, data) where {T, N, M<:NTuple{N,AlgebraicMesh}, D<:Tuple}    
+        # check mesh and data sizes match
+        @assert length(meshes) == length(data)
+        for (mesh,d) in zip(meshes, data)
+            @assert length(mesh.complex) == length(data)
+            for (m,v) in zip(mesh.complex,d)
+                @assert length(m) == length(v)
+            end
+        end
+        new{T,N,M,D}(mesh, data)
+    end
 end
+
+const AlgebraicMeshVector{T, M<:Tuple{AlgebraicMesh}, D<:Tuple{Tuple}} = AlgebraicMeshArray{T, 1, M, D}
+const AlgebraicMeshMatrix{T, M<:NTuple{2,AlgebraicMesh}, D<:NTuple{2,Tuple}} = AlgebraicMeshArray{T, 2, M, D}
 
 end # module AlgebraicMeshFEM

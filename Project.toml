@@ -1,7 +1,7 @@
 name = "AlgebraicMeshFEM"
 uuid = "83dc3876-f9c1-49ed-9770-995a93b700ec"
 authors = ["Sheehan Olver <solver@mac.com>"]
-version = "0.1.0"
+version = "0.0.1"
 
 [deps]
 AlgebraicMeshes = "6f309771-d163-45c3-98c4-9f437ea4a81a"
@@ -10,4 +10,6 @@ CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClassicalOrthogonalPolynomials = "b30e2e7b-c4ee-47da-9d5f-2c5c27239acd"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
+InfiniteArrays = "4858937d-0d70-526a-a4dd-2d5cb5dd786c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"

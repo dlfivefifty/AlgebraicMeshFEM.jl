@@ -1,8 +1,8 @@
 module AlgebraicMeshFEM
 using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays
 using ContinuumArrays: Basis
-import Base: getindex, axes
-export AlgebraicMeshVector
+import Base: getindex, axes, first, last
+export AlgebraicMeshVector, AlgebraicMeshAxis
 
 """
     ElementIndex(dim, elnum, basisind)
@@ -21,10 +21,17 @@ end
 gives the map between a mesh and the axes of the correspond
 coefficient vector.
 """
-struct AlgebraicMeshAxis{λ, M<:AlgebraicMesh, Sz<:Tuple} <: AbstractUnitRange{Int}
+struct AlgebraicMeshAxis{M<:AlgebraicMesh, Ax<:Tuple, LENG<:Integer} <: AbstractUnitRange{Int}
     mesh::M
-    sizes::Sz
+    axes::Ax
+    length::LENG
 end
+
+AlgebraicMeshAxis(mesh::AlgebraicMesh, ax::Tuple) = AlgebraicMeshAxis(mesh, ax, mapreduce(d -> mapreduce(length,+,d),+,ax))
+
+first(a::AlgebraicMeshAxis) = 1
+last(a::AlgebraicMeshAxis) = a.length
+
 
 """
     findelementindex(meshaxis, k)
@@ -54,25 +61,38 @@ end
 
 
 
-struct AlgebraicMeshArray{T, N, M<:NTuple{N,AlgebraicMesh}, D<:NTuple{N,Tuple}} <: LayoutArray{T,N}
-    mesh::M
+struct AlgebraicMeshVector{T, Ax<:AlgebraicMeshAxis, D<:Tuple} <: LayoutVector{T}
+    axis::Ax
     data::D # a tuple of vectors with same structure as mesh, containing vectors/matrices.
             # we interlace these to produce a single vector/matrix.
 
-    function AlgebraicMeshArray{T, N, M, D}(meshes, data) where {T, N, M<:NTuple{N,AlgebraicMesh}, D<:Tuple}    
+    function AlgebraicMeshVector{T, Ax, D}(ax, data) where {T, Ax<:AlgebraicMeshAxis, D<:Tuple}    
         # check mesh and data sizes match
-        @assert length(meshes) == length(data)
-        for (mesh,d) in zip(meshes, data)
-            @assert length(mesh.complex) == length(data)
-            for (m,v) in zip(mesh.complex,d)
-                @assert length(m) == length(v)
-            end
+        @assert length(ax.mesh.complex) == length(data)
+        for (m,v) in zip(ax.mesh.complex,data)
+            @assert length(m) == length(v)
         end
-        new{T,N,M,D}(mesh, data)
+        new{T,Ax,D}(ax, data)
     end
 end
 
-const AlgebraicMeshVector{T, M<:Tuple{AlgebraicMesh}, D<:Tuple{Tuple}} = AlgebraicMeshArray{T, 1, M, D}
-const AlgebraicMeshMatrix{T, M<:NTuple{2,AlgebraicMesh}, D<:NTuple{2,Tuple}} = AlgebraicMeshArray{T, 2, M, D}
+AlgebraicMeshVector(ax::AlgebraicMeshAxis, data) = AlgebraicMeshVector{Float64, typeof(ax), typeof(data)}(ax, data)
+AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMeshAxis(mesh, map(d -> map(e -> axes(e,1), d), data)), data)
+
+# struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}
+#     axes::M
+#     data::D # a tuple of vectors with same structure as mesh, containing vectors/matrices.
+#             # we interlace these to produce a single vector/matrix.
+
+#     function AlgebraicMeshArray{T, M, D}(mesh, data) where {T, N, M::AlgebraicMesh, D<:Tuple}    
+#         # check mesh and data sizes match
+#         @assert length(mesh.complex) == length(data)
+#         for (m,v) in zip(mesh.complex,data)
+#             @assert length(m) == length(v)
+#         end
+#         new{T,M,D}(mesh, data)
+#     end
+# end
+
 
 end # module AlgebraicMeshFEM

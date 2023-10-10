@@ -7,7 +7,7 @@ using AlgebraicMeshFEM, AlgebraicMeshes, DomainSets, StaticArrays, InfiniteArray
     
     AlgebraicMeshAxis(mesh, map(d -> map(e -> axes(e,1), d), data))
 
-    c = AlgebraicMeshVector(mesh, )
+    c = AlgebraicMeshVector(mesh, data)
 end
 
 mesh = interior(AlgebraicMesh([(0..1) × (1..2) , (0..1) × (0..1), (1..2) × (0..1)]))

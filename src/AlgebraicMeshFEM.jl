@@ -1,15 +1,15 @@
 module AlgebraicMeshFEM
 using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays
 using ContinuumArrays: Basis
-import Base: getindex, axes, first, last
-export AlgebraicMeshVector, AlgebraicMeshAxis
+import Base: getindex, axes, first, last, size
+export AlgebraicMeshVector, AlgebraicMeshAxis, ElementIndex
 
 """
     ElementIndex(dim, elnum, basisind)
 
 
 """
-struct ElementIndex{N,Ind}
+struct ElementIndex{Ind}
     dim::Int
     elindex::Int
     basisind::Ind
@@ -31,6 +31,7 @@ AlgebraicMeshAxis(mesh::AlgebraicMesh, ax::Tuple) = AlgebraicMeshAxis(mesh, ax, 
 
 first(a::AlgebraicMeshAxis) = 1
 last(a::AlgebraicMeshAxis) = a.length
+Base.unitrange(a::AlgebraicMeshAxis) = 1:length(a)
 
 
 """
@@ -38,8 +39,8 @@ last(a::AlgebraicMeshAxis) = a.length
 
 converts an integer index `k` to the corresp[onding `ElementIndex`
 """
-function findelementindex(meshaxis, k::Int)
-
+function findelementindex(meshaxis::AlgebraicMeshAxis, k::Int)
+    
 end
 
 struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Sz<:Tuple} <: Basis{T}
@@ -78,6 +79,11 @@ end
 
 AlgebraicMeshVector(ax::AlgebraicMeshAxis, data) = AlgebraicMeshVector{Float64, typeof(ax), typeof(data)}(ax, data)
 AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMeshAxis(mesh, map(d -> map(e -> axes(e,1), d), data)), data)
+
+axes(a::AlgebraicMeshVector) = (a.axis,)
+size(a::AlgebraicMeshVector) = (length(a.axis),)
+
+getindex(a::AlgebraicMeshVector, k::Int) = a[findelementindex(axes(a,1),k)]
 
 # struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}
 #     axes::M

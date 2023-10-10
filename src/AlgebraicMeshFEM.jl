@@ -5,6 +5,7 @@ import Base: getindex, axes, first, last, size, oneto
 import ArrayLayouts: colsupport, MemoryLayout
 import ClassicalOrthogonalPolynomials: legendre
 import DomainSets: UnitInterval, Rectangle, leftendpoint, rightendpoint
+import BlockArrays: blockcolsupport
 export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
 
 
@@ -194,6 +195,26 @@ function colsupport(a::AlgebraicMeshVector{<:Any,<:AlgebraicMeshAxis{2}}, j)
         r = max(r, (N-1) * n_e + k + n_v)
     end
     oneto(r)
+end
+
+function blockcolsupport(a::AlgebraicMeshVector{<:Any,<:AlgebraicMeshAxis{3}}, j)
+    n_v,n_f,n_e = map(length,a.axis.axes)
+    r = 1
+    for k = 1:n_f
+        N = last(colsupport(a.data[2][k]))
+        r = max(r,last(colsupport(a.data[2][k])))
+    end
+    for k = 1:n_e
+        r = max(r,Int(last(blockcolsupport(a.data[3][k]))))
+    end
+
+    Block.(oneto(r))
+end
+
+function colsupport(a::AlgebraicMeshVector{<:Any,<:AlgebraicMeshAxis{3}}, j)
+    n_v,n_f,n_e = map(length,a.axis.axes)
+    N = Int(last(blockcolsupport(a, j)))
+    oneto(n_v + N*n_f + (N*(N+1)÷2)*n_e)
 end
 
 # struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}

@@ -2,7 +2,7 @@ module AlgebraicMeshFEM
 using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays
 using ContinuumArrays: Basis
 import Base: getindex, axes, first, last, size
-export AlgebraicMeshVector, AlgebraicMeshAxis, ElementIndex
+export AlgebraicMeshVector, AlgebraicMeshAxis, ElementIndex, findelementindex
 
 """
     ElementIndex(dim, elnum, basisind)
@@ -21,13 +21,12 @@ end
 gives the map between a mesh and the axes of the correspond
 coefficient vector.
 """
-struct AlgebraicMeshAxis{M<:AlgebraicMesh, Ax<:Tuple, LENG<:Integer} <: AbstractUnitRange{Int}
-    mesh::M
+struct AlgebraicMeshAxis{Ax<:Tuple, LENG<:Integer} <: AbstractUnitRange{Int}
     axes::Ax
     length::LENG
 end
 
-AlgebraicMeshAxis(mesh::AlgebraicMesh, ax::Tuple) = AlgebraicMeshAxis(mesh, ax, mapreduce(d -> mapreduce(length,+,d),+,ax))
+AlgebraicMeshAxis(ax::Tuple) = AlgebraicMeshAxis(ax, mapreduce(d -> mapreduce(length,+,d),+,ax))
 
 first(a::AlgebraicMeshAxis) = 1
 last(a::AlgebraicMeshAxis) = a.length
@@ -39,8 +38,13 @@ Base.unitrange(a::AlgebraicMeshAxis) = 1:length(a)
 
 converts an integer index `k` to the corresp[onding `ElementIndex`
 """
-function findelementindex(meshaxis::AlgebraicMeshAxis, k::Int)
-    
+function findelementindex(meshaxis::AlgebraicMeshAxis{<:NTuple{2,Any}}, k::Int)
+    # put all vertices first
+    n_v,n_e = map(length,meshaxis.axes)
+    k ≤ n_v && return ElementIndex(1, k, 1)
+    k -= n_v
+    ind,el = divrem(k-1, n_e)
+    ElementIndex(2, el+1, ind+1)
 end
 
 struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Sz<:Tuple} <: Basis{T}
@@ -69,8 +73,8 @@ struct AlgebraicMeshVector{T, Ax<:AlgebraicMeshAxis, D<:Tuple} <: LayoutVector{T
 
     function AlgebraicMeshVector{T, Ax, D}(ax, data) where {T, Ax<:AlgebraicMeshAxis, D<:Tuple}    
         # check mesh and data sizes match
-        @assert length(ax.mesh.complex) == length(data)
-        for (m,v) in zip(ax.mesh.complex,data)
+        @assert length(ax.axes) == length(data)
+        for (m,v) in zip(ax.axes,data)
             @assert length(m) == length(v)
         end
         new{T,Ax,D}(ax, data)
@@ -78,11 +82,12 @@ struct AlgebraicMeshVector{T, Ax<:AlgebraicMeshAxis, D<:Tuple} <: LayoutVector{T
 end
 
 AlgebraicMeshVector(ax::AlgebraicMeshAxis, data) = AlgebraicMeshVector{Float64, typeof(ax), typeof(data)}(ax, data)
-AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMeshAxis(mesh, map(d -> map(e -> axes(e,1), d), data)), data)
+AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMeshAxis(map(d -> map(e -> axes(e,1), d), data)), data)
 
 axes(a::AlgebraicMeshVector) = (a.axis,)
 size(a::AlgebraicMeshVector) = (length(a.axis),)
 
+getindex(a::AlgebraicMeshVector, K::ElementIndex) = a.data[K.dim][K.elindex][K.basisind]
 getindex(a::AlgebraicMeshVector, k::Int) = a[findelementindex(axes(a,1),k)]
 
 # struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}

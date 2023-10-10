@@ -1,10 +1,10 @@
 module AlgebraicMeshFEM
-using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays, LinearAlgebra
+using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays, LinearAlgebra, BlockArrays, MultivariateOrthogonalPolynomials
 import ContinuumArrays: Basis, AffineMap, AbstractQuasiVector, AbstractAffineQuasiVector, affine_getindex, measure, affinemap_A, affinemap_b, PaddedLayout
 import Base: getindex, axes, first, last, size, oneto
 import ArrayLayouts: colsupport, MemoryLayout
 import ClassicalOrthogonalPolynomials: legendre
-import DomainSets: UnitInterval
+import DomainSets: UnitInterval, Rectangle, leftendpoint, rightendpoint
 export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
 
 
@@ -31,6 +31,12 @@ AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {
 AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {T<:SVector,V} = AffineMap{promote_type(eltype(T),V), typeof(domain),typeof(range)}(domain,range)
 getindex(A::AbstractAffineQuasiVector{<:Any,<:Any,<:Inclusion{<:SVector{d}}}, k::SVector{d}) where d = affine_getindex(A, k)
 
+function legendre(r::Rectangle)
+    (a,c) = leftendpoint(r)
+    (b,d) = rightendpoint(r)
+    RectPolynomial(legendre(a..b), legendre(c..d))
+end
+
 ###
 # Element-based arrays
 ###
@@ -51,12 +57,12 @@ end
 gives the map between a mesh and the axes of the correspond
 coefficient vector.
 """
-struct AlgebraicMeshAxis{Ax<:Tuple, LENG<:Integer} <: AbstractUnitRange{Int}
+struct AlgebraicMeshAxis{N, Ax<:NTuple{N,Any}, LENG<:Integer} <: AbstractUnitRange{Int}
     axes::Ax
     length::LENG
 end
 
-AlgebraicMeshAxis(ax::Tuple) = AlgebraicMeshAxis(ax, mapreduce(d -> mapreduce(length,+,d),+,ax))
+AlgebraicMeshAxis(ax::Tuple) = AlgebraicMeshAxis(ax, mapreduce(d -> isempty(d) ? 0 : mapreduce(length,+,d),+,ax))
 
 first(a::AlgebraicMeshAxis) = 1
 last(a::AlgebraicMeshAxis) = a.length
@@ -68,7 +74,7 @@ Base.unitrange(a::AlgebraicMeshAxis) = 1:length(a)
 
 converts an integer index `k` to the corresp[onding `ElementIndex`
 """
-function findelementindex(meshaxis::AlgebraicMeshAxis{<:NTuple{2,Any}}, k::Int)
+function findelementindex(meshaxis::AlgebraicMeshAxis{2}, k::Int)
     # put all vertices first
     n_v,n_e = map(length,meshaxis.axes)
     k ≤ n_v && return ElementIndex(1, k, 1)
@@ -77,23 +83,46 @@ function findelementindex(meshaxis::AlgebraicMeshAxis{<:NTuple{2,Any}}, k::Int)
     ElementIndex(2, el+1, ind+1)
 end
 
-struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Ax<:Tuple} <: Basis{T}
+function findelementindex(meshaxis::AlgebraicMeshAxis{3}, k::Int)
+    # put all vertices first
+    n_v,n_f,n_e = map(length,meshaxis.axes)
+    k ≤ n_v && return ElementIndex(1, k, 1)
+    k -= n_v
+    # block size is n_f + n_e*K
+    # so number of inds up to block N is n_f*N + n_e*N*(1+N)/2
+    # solving for N we get
+    K = (-n_e - 2n_f + isqrt(8*(k-1)n_e + (n_e+2n_f)^2)) ÷ (2n_e) + 1
+    # subtract previous blocks
+    prev_inds = ((K-1)*K)÷2
+    k -= n_f*(K-1) + n_e*prev_inds
+
+    k ≤ n_f && return ElementIndex(2, k, K)
+    k -= n_f
+
+
+    el,ind = divrem(k-1, K)
+    # want to do Block(K)[ind+1] but for now we keep type instability
+    ElementIndex(3, el+1, prev_inds + ind+1)
+end
+
+struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Ax} <: Basis{T}
     mesh::M
-    axes::Ax
+    caxis::Ax
 end
 
 _mesh2axes() = ()
 _mesh2axes(::SVector) = oneto(1)
 _mesh2axes(::LineSegment) = oneto(∞)
+_mesh2axes(::Rectangle) = blockedrange(oneto(∞))
 _mesh2axes(a::Vector, b...) = (map(_mesh2axes,a), _mesh2axes(b...)...)
 
 
 AlgebraicMeshPolynomial{λ}(mesh, axes) where λ = AlgebraicMeshPolynomial{λ,Float64,typeof(mesh),typeof(axes)}(mesh, axes)
-AlgebraicMeshPolynomial{λ}(mesh) where λ = AlgebraicMeshPolynomial{λ}(mesh,_mesh2axes(mesh.complex...))
+AlgebraicMeshPolynomial{λ}(mesh) where λ = AlgebraicMeshPolynomial{λ}(mesh, AlgebraicMeshAxis(_mesh2axes(mesh.complex...)))
 
 
 
-axes(P::AlgebraicMeshPolynomial{λ}) where λ = (Inclusion(P.mesh), AlgebraicMeshAxis(P.axes))
+axes(P::AlgebraicMeshPolynomial{λ}) where λ = (Inclusion(P.mesh), P.caxis)
 
 getindex(P::AlgebraicMeshPolynomial, 𝐱::SVector, k::Int) = P[𝐱, findelementindex(axes(P,2), k)]
 function getindex(P::AlgebraicMeshPolynomial{0,T}, 𝐱::SVector, K::ElementIndex) where T
@@ -114,7 +143,7 @@ end
 
 bubble(edge::LineSegment) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
 
-function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:NTuple{2,Any}}, 𝐱::SVector, K::ElementIndex) where T
+function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:AlgebraicMeshAxis{2}}, 𝐱::SVector, K::ElementIndex) where T
     # TODO: check axes
     el = P.mesh.complex[K.dim][K.elindex]
     if K.dim == 1 # vertices
@@ -157,7 +186,7 @@ size(a::AlgebraicMeshVector) = (length(a.axis),)
 getindex(a::AlgebraicMeshVector{T}, K::ElementIndex) where T = convert(T,a.data[K.dim][K.elindex][K.basisind])::T
 getindex(a::AlgebraicMeshVector, k::Int) = a[findelementindex(axes(a,1),k)]
 
-function colsupport(a::AlgebraicMeshVector{<:Any,<:Any,<:NTuple{2,Any}}, j)
+function colsupport(a::AlgebraicMeshVector{<:Any,<:AlgebraicMeshAxis{2}}, j)
     n_v,n_e = map(length,a.axis.axes)
     r = n_v
     for k = 1:n_e

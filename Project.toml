@@ -6,6 +6,7 @@ version = "0.0.1"
 [deps]
 AlgebraicMeshes = "6f309771-d163-45c3-98c4-9f437ea4a81a"
 ArrayLayouts = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
+BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClassicalOrthogonalPolynomials = "b30e2e7b-c4ee-47da-9d5f-2c5c27239acd"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"

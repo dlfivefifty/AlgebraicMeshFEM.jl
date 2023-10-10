@@ -1,8 +1,10 @@
 module AlgebraicMeshFEM
 using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays, LinearAlgebra
-import ContinuumArrays: Basis, AffineMap, AbstractQuasiVector, AbstractAffineQuasiVector, affine_getindex, measure
+import ContinuumArrays: Basis, AffineMap, AbstractQuasiVector, AbstractAffineQuasiVector, affine_getindex, measure, affinemap_A, affinemap_b, PaddedLayout
 import Base: getindex, axes, first, last, size, oneto
+import ArrayLayouts: colsupport, MemoryLayout
 import ClassicalOrthogonalPolynomials: legendre
+import DomainSets: UnitInterval
 export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
 
 
@@ -11,6 +13,19 @@ export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementI
 ###
 
 measure(ℓ::Inclusion{<:Any,<:LineSegment}) = norm(ℓ.domain.b - ℓ.domain.a)
+function affinemap_A(m::AffineMap{<:Number,<:Inclusion{<:SVector}})
+    domain, range = getfield(m, :domain), getfield(m, :range)
+    ba = last(domain)-first(domain)
+    c,d = first(range),last(range)
+    (d-c)/norm(ba)^2 * ba'
+end
+function affinemap_b(m::AffineMap{<:Number,<:Inclusion{<:SVector}})
+    domain, range = getfield(m, :domain), getfield(m, :range)
+    a,b = first(domain),last(domain)
+    c,d = first(range),last(range)
+    ba = b-a
+    (c-d)/norm(ba)^2 * ba'a + c
+end
 legendre(ℓ::LineSegment{d,T}) where {d,T} = Legendre{float(T)}()[affine(ℓ,ChebyshevInterval{T}()), :]
 AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {d,T<:Number,V<:SVector{d}} = AffineMap{promote_type(SVector{d,T},V), typeof(domain),typeof(range)}(domain,range)
 AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {T<:SVector,V} = AffineMap{promote_type(eltype(T),V), typeof(domain),typeof(range)}(domain,range)
@@ -88,6 +103,17 @@ function getindex(P::AlgebraicMeshPolynomial{0,T}, 𝐱::SVector, K::ElementInde
     convert(T,legendre(el)[𝐱, K.basisind])::T
 end
 
+function vertexmode(vertex, edge::LineSegment, 𝐱)
+    if vertex == edge.a
+        1-affine(edge, UnitInterval())[𝐱]
+    else
+        @assert vertex == edge.b
+        affine(edge, UnitInterval())[𝐱]
+    end
+end
+
+bubble(edge::LineSegment) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
+
 function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:NTuple{2,Any}}, 𝐱::SVector, K::ElementIndex) where T
     # TODO: check axes
     el = P.mesh.complex[K.dim][K.elindex]
@@ -96,7 +122,7 @@ function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:NTuple{2,Any}}, 𝐱::S
         𝐱 ∈ ne || return zero(T) # zero outside element
         ed = edges(ne)
         j = findfirst(e -> 𝐱 ∈ e, ed)
-        vertexmode(ed[j], el, 𝐱)
+        vertexmode(el, ed[j], 𝐱)
     else # K.dim == 2 # elements
         𝐱 ∈ el || return zero(T) # zero outside element
         convert(T,bubble(el)[𝐱, K.basisind])::T
@@ -123,11 +149,23 @@ end
 AlgebraicMeshVector(ax::AlgebraicMeshAxis, data) = AlgebraicMeshVector{Float64, typeof(ax), typeof(data)}(ax, data)
 AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMeshAxis(map(d -> map(e -> axes(e,1), d), data)), data)
 
+# MemoryLayout(::Type{<:AlgebraicMeshVector}) = PaddedLayout{UnknownLayout}()
+
 axes(a::AlgebraicMeshVector) = (a.axis,)
 size(a::AlgebraicMeshVector) = (length(a.axis),)
 
 getindex(a::AlgebraicMeshVector{T}, K::ElementIndex) where T = convert(T,a.data[K.dim][K.elindex][K.basisind])::T
 getindex(a::AlgebraicMeshVector, k::Int) = a[findelementindex(axes(a,1),k)]
+
+function colsupport(a::AlgebraicMeshVector{<:Any,<:Any,<:NTuple{2,Any}}, j)
+    n_v,n_e = map(length,a.axis.axes)
+    r = n_v
+    for k = 1:n_e
+        N = last(colsupport(a.data[2][k]))
+        r = max(r, (N-1) * n_e + k + n_v)
+    end
+    oneto(r)
+end
 
 # struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}
 #     axes::M

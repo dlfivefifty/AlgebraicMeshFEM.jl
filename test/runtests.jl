@@ -39,6 +39,7 @@ end
 
 @testset "2D" begin
     mesh = interior(AlgebraicMesh([(0..1) × (1..2) , (0..1) × (0..1), (1..2) × (0..1)]))
+    P = AlgebraicMeshPolynomial{0}(mesh)    
 end
 
 

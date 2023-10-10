@@ -1,9 +1,24 @@
 module AlgebraicMeshFEM
-using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays
-using ContinuumArrays: Basis
-import Base: getindex, axes, first, last, size
-export AlgebraicMeshVector, AlgebraicMeshAxis, ElementIndex, findelementindex
+using AlgebraicMeshes, ArrayLayouts, ClassicalOrthogonalPolynomials, ContinuumArrays, StaticArrays, LinearAlgebra
+import ContinuumArrays: Basis, AffineMap, AbstractQuasiVector, AbstractAffineQuasiVector, affine_getindex, measure
+import Base: getindex, axes, first, last, size, oneto
+import ClassicalOrthogonalPolynomials: legendre
+export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
 
+
+###
+# Classical OPs on segments
+###
+
+measure(ℓ::Inclusion{<:Any,<:LineSegment}) = norm(ℓ.domain.b - ℓ.domain.a)
+legendre(ℓ::LineSegment{d,T}) where {d,T} = Legendre{float(T)}()[affine(ℓ,ChebyshevInterval{T}()), :]
+AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {d,T<:Number,V<:SVector{d}} = AffineMap{promote_type(SVector{d,T},V), typeof(domain),typeof(range)}(domain,range)
+AffineMap(domain::AbstractQuasiVector{T}, range::AbstractQuasiVector{V}) where {T<:SVector,V} = AffineMap{promote_type(eltype(T),V), typeof(domain),typeof(range)}(domain,range)
+getindex(A::AbstractAffineQuasiVector{<:Any,<:Any,<:Inclusion{<:SVector{d}}}, k::SVector{d}) where d = affine_getindex(A, k)
+
+###
+# Element-based arrays
+###
 """
     ElementIndex(dim, elnum, basisind)
 
@@ -47,21 +62,45 @@ function findelementindex(meshaxis::AlgebraicMeshAxis{<:NTuple{2,Any}}, k::Int)
     ElementIndex(2, el+1, ind+1)
 end
 
-struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Sz<:Tuple} <: Basis{T}
+struct AlgebraicMeshPolynomial{λ, T, M<:AlgebraicMesh, Ax<:Tuple} <: Basis{T}
     mesh::M
-    sizes::Sz
+    axes::Ax
 end
 
+_mesh2axes() = ()
+_mesh2axes(::SVector) = oneto(1)
+_mesh2axes(::LineSegment) = oneto(∞)
+_mesh2axes(a::Vector, b...) = (map(_mesh2axes,a), _mesh2axes(b...)...)
 
-axes(P::AlgebraicMeshPolynomial{λ}) where λ = (Inclusion(P.mesh), AlgebraicMeshAxis{λ}(P.mesh, P.sizes))
+
+AlgebraicMeshPolynomial{λ}(mesh, axes) where λ = AlgebraicMeshPolynomial{λ,Float64,typeof(mesh),typeof(axes)}(mesh, axes)
+AlgebraicMeshPolynomial{λ}(mesh) where λ = AlgebraicMeshPolynomial{λ}(mesh,_mesh2axes(mesh.complex...))
+
+
+
+axes(P::AlgebraicMeshPolynomial{λ}) where λ = (Inclusion(P.mesh), AlgebraicMeshAxis(P.axes))
 
 getindex(P::AlgebraicMeshPolynomial, 𝐱::SVector, k::Int) = P[𝐱, findelementindex(axes(P,2), k)]
 function getindex(P::AlgebraicMeshPolynomial{0,T}, 𝐱::SVector, K::ElementIndex) where T
     # TODO: check axes
-    K.dims == 3 || return zero(T) # only elements have a basis attached
-    el = elements(P.mesh)[K.elindex]
+    el = P.mesh.complex[K.dim][K.elindex]
     𝐱 ∈ el || return zero(T) # zero outside element
-    legendre(el)[𝐱, K.basisind]
+    convert(T,legendre(el)[𝐱, K.basisind])::T
+end
+
+function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:NTuple{2,Any}}, 𝐱::SVector, K::ElementIndex) where T
+    # TODO: check axes
+    el = P.mesh.complex[K.dim][K.elindex]
+    if K.dim == 1 # vertices
+        ne = neighborhood(P.mesh, el)
+        𝐱 ∈ ne || return zero(T) # zero outside element
+        ed = edges(ne)
+        j = findfirst(e -> 𝐱 ∈ e, ed)
+        vertexmode(ed[j], el, 𝐱)
+    else # K.dim == 2 # elements
+        𝐱 ∈ el || return zero(T) # zero outside element
+        convert(T,bubble(el)[𝐱, K.basisind])::T
+    end
 end
 
 
@@ -87,7 +126,7 @@ AlgebraicMeshVector(mesh::AlgebraicMesh, data) = AlgebraicMeshVector(AlgebraicMe
 axes(a::AlgebraicMeshVector) = (a.axis,)
 size(a::AlgebraicMeshVector) = (length(a.axis),)
 
-getindex(a::AlgebraicMeshVector, K::ElementIndex) = a.data[K.dim][K.elindex][K.basisind]
+getindex(a::AlgebraicMeshVector{T}, K::ElementIndex) where T = convert(T,a.data[K.dim][K.elindex][K.basisind])::T
 getindex(a::AlgebraicMeshVector, k::Int) = a[findelementindex(axes(a,1),k)]
 
 # struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}

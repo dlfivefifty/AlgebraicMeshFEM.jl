@@ -59,6 +59,15 @@ end
     @test f[SVector(0.1,1.2)] ≈ 4
     @test f[SVector(0.1,0.2)] ≈ 5
     @test f[SVector(1.1,0.2)] ≈ 6
+
+    C = AlgebraicMeshPolynomial{1}(mesh)
+    W = Weighted(jacobi(1,1,0..1))
+    @test C[SVector(0.1,1.2),1:6] ≈ [W[0.1,1] * 0.8, 0, W[0.1,1]W[0.8,1], 0, 0, W[0.1,2] * 0.8]
+    @test C[SVector(0.1,0.2),1:6] ≈ [W[0.1,1] * 0.2, 0.1*W[0.2,1], 0, W[0.1,1]W[0.2,1], 0, W[0.1,2] * 0.2]
+    @test C[SVector(1.1,0.2),1:6] ≈ [0, 0.9*W[0.2,1], 0, 0, W[0.1,1]W[0.2,1], 0]
+
+    f = C*c
+    @test f[SVector(0.1,1.2)] ≈ 2W[0.1,1] * 0.8 + 4W[0.1,1]W[0.8,1]
 end
 
 

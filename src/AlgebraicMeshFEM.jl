@@ -142,7 +142,32 @@ function vertexmode(vertex, edge::LineSegment, 𝐱)
     end
 end
 
+function facebubble(edge::LineSegment, el::Rectangle, k, 𝐱)
+    a,c = leftendpoint(el)
+    b,d = rightendpoint(el)
+    x,y = 𝐱
+
+    if edge.a == SVector(a,c) && edge.b == SVector(b,c) # bottom
+        Weighted(jacobi(1,1,a..b))[x,k] * (d-y)/(d-c)
+    elseif edge.a == SVector(a,c) && edge.b == SVector(a,d) # left
+        (b-x)/(b-a) * Weighted(jacobi(1,1,c..d))[y,k]
+    elseif edge.a == SVector(a,d) && edge.b == SVector(b,d) # top
+        Weighted(jacobi(1,1,a..b))[x,k] * (y-c)/(d-c)
+    else # right
+        @assert edge.a == SVector(b,c) && edge.b == SVector(b,d)
+        (x-a)/(b-a) * Weighted(jacobi(1,1,c..d))[y,k]
+    end
+end
+
 bubble(edge::LineSegment) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
+bubble(edge::Rectangle) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
+
+
+function bubble(r::Rectangle)
+    (a,c) = leftendpoint(r)
+    (b,d) = rightendpoint(r)
+    RectPolynomial(Weighted(jacobi(1,1,a..b)), Weighted(jacobi(1,1,c..d)))
+end
 
 function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:AlgebraicMeshAxis{2}}, 𝐱::SVector, K::ElementIndex) where T
     # TODO: check axes
@@ -154,6 +179,27 @@ function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:AlgebraicMeshAxis{2}}, 
         j = findfirst(e -> 𝐱 ∈ e, ed)
         vertexmode(el, ed[j], 𝐱)
     else # K.dim == 2 # elements
+        𝐱 ∈ el || return zero(T) # zero outside element
+        convert(T,bubble(el)[𝐱, K.basisind])::T
+    end
+end
+
+function getindex(P::AlgebraicMeshPolynomial{1,T,<:Any,<:AlgebraicMeshAxis{3}}, 𝐱::SVector, K::ElementIndex) where T
+    # TODO: check axes
+    el = P.mesh.complex[K.dim][K.elindex]
+    if K.dim == 1 # vertices
+        ne = neighborhood(P.mesh, el)
+        𝐱 ∈ ne || return zero(T) # zero outside element
+        ed = elements(ne)
+        j = findfirst(e -> 𝐱 ∈ e, ed)
+        vertexmode(el, ed[j], 𝐱)
+    elseif K.dim == 2 # faces
+        ne = neighborhood(P.mesh, el)
+        𝐱 ∈ ne || return zero(T) # zero outside element
+        ed = elements(ne)
+        j = findfirst(e -> 𝐱 ∈ e, ed)
+        facebubble(el, ed[j], K.basisind, 𝐱)
+    else #K.dim == 3 # elements
         𝐱 ∈ el || return zero(T) # zero outside element
         convert(T,bubble(el)[𝐱, K.basisind])::T
     end

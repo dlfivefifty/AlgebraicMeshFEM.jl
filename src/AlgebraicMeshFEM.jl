@@ -6,7 +6,7 @@ import ArrayLayouts: colsupport, MemoryLayout
 import ClassicalOrthogonalPolynomials: legendre
 import DomainSets: UnitInterval, Rectangle, leftendpoint, rightendpoint
 import BlockArrays: blockcolsupport
-export AlgebraicMeshVector, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
+export AlgebraicMeshVector, AlgebraicMeshMatrix, AlgebraicMeshAxis, AlgebraicMeshPolynomial, ElementIndex, findelementindex
 
 
 ###
@@ -160,8 +160,6 @@ function facebubble(edge::LineSegment, el::Rectangle, k, 𝐱)
 end
 
 bubble(edge::LineSegment) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
-bubble(edge::Rectangle) = Weighted(Jacobi(1,1))[affine(edge, ChebyshevInterval()), :]
-
 
 function bubble(r::Rectangle)
     (a,c) = leftendpoint(r)
@@ -263,20 +261,20 @@ function colsupport(a::AlgebraicMeshVector{<:Any,<:AlgebraicMeshAxis{3}}, j)
     oneto(n_v + N*n_f + (N*(N+1)÷2)*n_e)
 end
 
-# struct AlgebraicMeshMatrix{T, Ax, D::Tuple} <: LayoutVector{T}
-#     axes::M
-#     data::D # a tuple of vectors with same structure as mesh, containing vectors/matrices.
-#             # we interlace these to produce a single vector/matrix.
+struct AlgebraicMeshMatrix{T, Ax, D<:Dict} <: LayoutMatrix{T}
+    axes::Ax
+    data::D
+end
+AlgebraicMeshMatrix{T}(axes, data) where T = AlgebraicMeshMatrix{T,typeof(axes),typeof(data)}(axes,data)
+AlgebraicMeshMatrix(axs, data) = AlgebraicMeshMatrix{mapreduce(eltype,promote_type,values(data))}(axs, data)
 
-#     function AlgebraicMeshArray{T, M, D}(mesh, data) where {T, N, M::AlgebraicMesh, D<:Tuple}    
-#         # check mesh and data sizes match
-#         @assert length(mesh.complex) == length(data)
-#         for (m,v) in zip(mesh.complex,data)
-#             @assert length(m) == length(v)
-#         end
-#         new{T,M,D}(mesh, data)
-#     end
-# end
+axes(A::AlgebraicMeshMatrix) = A.axes
+size(A::AlgebraicMeshMatrix) = map(length,A.axes)
 
+getindex(A::AlgebraicMeshMatrix, k::Int, j::Int) = A[findelementindex(axes(A,1),k), findelementindex(axes(A,2),j)]
+function getindex(A::AlgebraicMeshMatrix{T}, K::ElementIndex, J::ElementIndex) where T
+    haskey(A.data, ((K.dim, K.elindex), (J.dim, J.elindex))) || return zero(T)
+    A.data[((K.dim, K.elindex), (J.dim, J.elindex))][K.basisind,J.basisind]
+end
 
 end # module AlgebraicMeshFEM

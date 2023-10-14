@@ -1,5 +1,5 @@
 using AlgebraicMeshFEM, AlgebraicMeshes, DomainSets, StaticArrays, InfiniteArrays, ClassicalOrthogonalPolynomials, Test
-using ContinuumArrays: affine
+using ContinuumArrays: affine, grammatrix
 using MultivariateOrthogonalPolynomials: DiagTrav
 
 @testset "line segments" begin
@@ -27,19 +27,36 @@ end
     @test f[SVector(0.1,0)] ≈ 2
     @test f[SVector(1.1,0)] ≈ 3
 
-    P = AlgebraicMeshPolynomial{1}(mesh)
+    C = AlgebraicMeshPolynomial{1}(mesh)
     W = Weighted(Jacobi(1,1))
 
-    @test P[SVector(0.1,0), 1] ≈ 0.1
-    @test P[SVector(1.1,0), 1] ≈ 0.9
-    @test P[SVector(0.1,0), 2] ≈ W[2*0.1-1,1]
-    @test P[SVector(1.1,0), 2] == 0
-    @test P[SVector(0.1,0), 3] == 0
-    @test P[SVector(1.1,0), 3] ≈ W[2*0.1-1,1]
+    @test C[SVector(0.1,0), 1] ≈ 0.1
+    @test C[SVector(1.1,0), 1] ≈ 0.9
+    @test C[SVector(0.1,0), 2] ≈ W[2*0.1-1,1]
+    @test C[SVector(1.1,0), 2] == 0
+    @test C[SVector(0.1,0), 3] == 0
+    @test C[SVector(1.1,0), 3] ≈ W[2*0.1-1,1]
 
-    f = P * c
+    f = C * c
     @test f[SVector(0.1,0)] ≈ 0.1 + 2*W[2*0.1-1,1]
     @test f[SVector(1.1,0)] ≈ 0.9 + 3*W[2*0.1-1,1]
+
+    @testset "operators" begin
+        L = Legendre() \ Weighted(Jacobi(1,1))
+        P = AlgebraicMeshPolynomial{0}(AlgebraicMesh((SVector{2,Float64}[],elements(mesh))))
+
+        x = Inclusion(0..1)
+        v = legendre(0..1)\ x
+        x = Inclusion(1..2)
+        w = legendre(1..2) \ (2 .- x)
+        d = Dict()
+        d[((2,1), (1,1))] = v
+        d[((2,2), (1,1))] = w
+        d[((2,1), (2,1))] = L
+        d[((2,2), (2,2))] = L
+        
+        A = AlgebraicMeshMatrix((axes(P,2),axes(C,2)), d)
+    end
 end
 
 @testset "2D" begin

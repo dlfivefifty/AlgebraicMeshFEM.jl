@@ -1,5 +1,6 @@
 using AlgebraicMeshFEM, AlgebraicMeshes, DomainSets, StaticArrays, InfiniteArrays, ClassicalOrthogonalPolynomials, Test
 using ContinuumArrays: affine, grammatrix
+using DomainSets: ×
 using MultivariateOrthogonalPolynomials: DiagTrav
 
 @testset "line segments" begin

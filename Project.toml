@@ -7,11 +7,23 @@ version = "0.0.1"
 AlgebraicMeshes = "6f309771-d163-45c3-98c4-9f437ea4a81a"
 ArrayLayouts = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClassicalOrthogonalPolynomials = "b30e2e7b-c4ee-47da-9d5f-2c5c27239acd"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
+HarmonicOrthogonalPolynomials = "e416a80e-9640-42f3-8df8-80a93ca01ea5"
 InfiniteArrays = "4858937d-0d70-526a-a4dd-2d5cb5dd786c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariateOrthogonalPolynomials = "4f6956fd-4f93-5457-9149-7bfc4b2ce06d"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+
+[compat]
+StaticArrays = "1"
+
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+
+[targets]
+test = ["Test"]

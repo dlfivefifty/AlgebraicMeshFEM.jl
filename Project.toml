@@ -16,14 +16,12 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariateOrthogonalPolynomials = "4f6956fd-4f93-5457-9149-7bfc4b2ce06d"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
-
 [compat]
+HarmonicOrthogonalPolynomials = "0.5"
 StaticArrays = "1"
-
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
 
 [targets]
 test = ["Test"]

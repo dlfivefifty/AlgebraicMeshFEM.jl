@@ -1,7 +1,7 @@
 name = "AlgebraicMeshFEM"
 uuid = "83dc3876-f9c1-49ed-9770-995a93b700ec"
-authors = ["Sheehan Olver <solver@mac.com>"]
 version = "0.0.1"
+authors = ["Sheehan Olver <solver@mac.com>"]
 
 [deps]
 AlgebraicMeshes = "6f309771-d163-45c3-98c4-9f437ea4a81a"
@@ -16,14 +16,12 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariateOrthogonalPolynomials = "4f6956fd-4f93-5457-9149-7bfc4b2ce06d"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
-
 [compat]
+MultivariateOrthogonalPolynomials = "0.10"
 StaticArrays = "1"
-
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
 
 [targets]
 test = ["Test"]
